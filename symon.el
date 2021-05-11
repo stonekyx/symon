@@ -463,7 +463,7 @@ while true; do
     echo $s | awk '{print \"rx:\"$7}'
     echo $s | awk '{print \"tx:\"$8}'
 
-    s=`hostinfo  | grep 'Load average' | awk '{print \"cpu:\"$3}' | sed 's/,//'`
+    s=`ps -A -o %%cpu | awk '{s+=$1} END {print \"cpu:\" s/%s}'`
     echo $s
 
     m1=`sysctl hw.memsize | sed 's/.*:\s*//'`
@@ -474,7 +474,7 @@ while true; do
     echo \"mem:$s\"
 
     sleep %d
-done" symon-refresh-rate)))
+done" (string-trim (shell-command-to-string "sysctl -n hw.ncpu")) symon-refresh-rate)))
 
 (define-symon-monitor symon-darwin-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
