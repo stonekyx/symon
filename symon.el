@@ -122,11 +122,11 @@ rendering."
 
 ;; network monitor
 
-(defcustom symon-network-rx-upper-bound 300
+(defcustom symon-network-rx-upper-bound nil
   "upper-bound of sparkline for network RX status."
   :group 'symon)
 
-(defcustom symon-network-tx-upper-bound 100
+(defcustom symon-network-tx-upper-bound nil
   "upper-bound of sparkline for network TX status."
   :group 'symon)
 
@@ -177,7 +177,7 @@ rendering."
   (let ((num-samples (length list)))
     (unless (zerop num-samples)
       (let* ((image-data (symon--get-sparkline-base))
-             (maximum (if maximum (float maximum) 100.0))
+             (maximum (if maximum (float maximum) (apply 'max (-filter 'identity list))))
              (minimum (if minimum (float minimum) 0.0))
              (topmargin (1- symon-sparkline-thickness))
              (height (- symon-sparkline-height topmargin))
@@ -382,6 +382,7 @@ supoprted in PLIST:
 
 (define-symon-monitor symon-linux-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
+  :upper-bound 100
   :setup (setq symon-linux--last-cpu-ticks nil)
   :fetch (cl-destructuring-bind (cpu)
              (symon-linux--read-lines
@@ -396,6 +397,7 @@ supoprted in PLIST:
 
 (define-symon-monitor symon-linux-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
+  :upper-bound 100
   :fetch (cl-destructuring-bind (memtotal memavailable memfree buffers cached)
              (symon-linux--read-lines
               "/proc/meminfo" (lambda (str) (and str (read str)))
@@ -461,7 +463,7 @@ while true; do
     interface=`route get 0.0.0.0 | grep interface | awk '{print $2}'`
     s=`netstat -bi -I $interface | tail -1`;
     echo $s | awk '{print \"rx:\"$7}'
-    echo $s | awk '{print \"tx:\"$8}'
+    echo $s | awk '{print \"tx:\"$10}'
 
     s=`ps -A -o %%cpu | awk '{s+=$1} END {print \"cpu:\" s/%s}'`
     echo $s
@@ -478,17 +480,20 @@ done" (string-trim (shell-command-to-string "sysctl -n hw.ncpu")) symon-refresh-
 
 (define-symon-monitor symon-darwin-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
+  :upper-bound 100
   :setup (symon-darwin--maybe-start-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "cpu"))
 
 (define-symon-monitor symon-darwin-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
+  :upper-bound 100
   :setup (symon-darwin--maybe-start-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "mem"))
 
 (defvar symon-darwin--last-network-rx nil)
+(defvar symon-darwin--last-network-rx-time 0)
 
 (define-symon-monitor symon-darwin-network-rx-monitor
   :index "RX:" :unit "KB/s" :sparkline t
@@ -498,12 +503,19 @@ done" (string-trim (shell-command-to-string "sysctl -n hw.ncpu")) symon-refresh-
            (symon-darwin--maybe-start-process)
            (setq symon-darwin--last-network-rx nil))
   :cleanup (symon--maybe-kill-process)
-  :fetch (let ((rx (symon--read-value-from-process-buffer "rx")))
+  :fetch (let ((rx (symon--read-value-from-process-buffer "rx"))
+               (now (time-convert nil 'integer)))
            (prog1 (when symon-darwin--last-network-rx
-                    (/ (- rx symon-darwin--last-network-rx) symon-refresh-rate 1000))
-             (setq symon-darwin--last-network-rx rx))))
+                    (/ (- rx symon-darwin--last-network-rx)
+                       (if (= now symon-darwin--last-network-rx-time)
+                           1
+                         (- now symon-darwin--last-network-rx-time))
+                       1000))
+             (setq symon-darwin--last-network-rx rx
+                   symon-darwin--last-network-rx-time now))))
 
 (defvar symon-darwin--last-network-tx nil)
+(defvar symon-darwin--last-network-tx-time 0)
 
 (define-symon-monitor symon-darwin-network-tx-monitor
   :index "TX:" :unit "KB/s" :sparkline t
@@ -513,10 +525,16 @@ done" (string-trim (shell-command-to-string "sysctl -n hw.ncpu")) symon-refresh-
            (symon-darwin--maybe-start-process)
            (setq symon-darwin--last-network-tx nil))
   :cleanup (symon--maybe-kill-process)
-  :fetch (let ((tx (symon--read-value-from-process-buffer "tx")))
+  :fetch (let ((tx (symon--read-value-from-process-buffer "tx"))
+               (now (time-convert nil 'integer)))
            (prog1 (when symon-darwin--last-network-tx
-                    (/ (- tx symon-darwin--last-network-tx) symon-refresh-rate 1000))
-             (setq symon-darwin--last-network-tx tx))))
+                    (/ (- tx symon-darwin--last-network-tx)
+                       (if (= now symon-darwin--last-network-tx-time)
+                           1
+                         (- now symon-darwin--last-network-tx-time))
+                       1000))
+             (setq symon-darwin--last-network-tx tx
+                   symon-darwin--last-network-tx-time now))))
 
 (define-symon-monitor symon-darwin-battery-monitor
   :index "BAT:" :unit "%" :sparkline t
@@ -564,12 +582,14 @@ while(1)                                                            \
 
 (define-symon-monitor symon-windows-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
+  :upper-bound 100
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "cpu"))
 
 (define-symon-monitor symon-windows-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
+  :upper-bound 100
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "mem"))
