@@ -144,6 +144,8 @@ rendering."
   "upper-bound of sparkline for page file usage."
   :group 'symon)
 
+(defvar symon-last-idle-time 0)
+
 ;; + utilities
 ;;   + general
 
@@ -735,8 +737,9 @@ while(1)                                                            \
 (defun symon-display ()
   "activate symon display."
   (interactive)
-  (setq symon--active-page 0)
-  (symon--display-update))
+  (unless (> symon-delay (- (time-convert nil 'integer) symon-last-idle-time))
+    (setq symon--active-page 0)
+    (symon--display-update)))
 
 (defun symon--redisplay ()
   "update symon display."
