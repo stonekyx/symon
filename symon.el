@@ -512,7 +512,7 @@ done" (string-trim (shell-command-to-string "sysctl -n hw.ncpu")) symon-refresh-
                        (if (= now symon-darwin--last-network-rx-time)
                            1
                          (- now symon-darwin--last-network-rx-time))
-                       1000))
+                       1024))
              (setq symon-darwin--last-network-rx rx
                    symon-darwin--last-network-rx-time now))))
 
@@ -534,7 +534,7 @@ done" (string-trim (shell-command-to-string "sysctl -n hw.ncpu")) symon-refresh-
                        (if (= now symon-darwin--last-network-tx-time)
                            1
                          (- now symon-darwin--last-network-tx-time))
-                       1000))
+                       1024))
              (setq symon-darwin--last-network-tx tx
                    symon-darwin--last-network-tx-time now))))
 
